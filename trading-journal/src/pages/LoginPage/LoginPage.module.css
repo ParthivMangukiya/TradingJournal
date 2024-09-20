@@ -1,0 +1,58 @@
+
+.login_page {
+  background: var(--login-background);
+  min-height: 100vh;
+}
+
+.chameleon_title {
+  font-size: 5rem;
+  padding: 0.2em 0;
+  text-align: center;
+  margin-bottom: 1.5rem;
+  background: linear-gradient(45deg, #ff00ff, #00ff00, #0000ff, #ff0000);
+  background-size: 300% 300%;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: rainbow 20s ease infinite;
+}
+
+@media (max-width: 768px) {
+  .chameleon-title {
+    font-size: 3.5rem;
+  }
+}
+
+@keyframes rainbow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.description {
+  font-size: 1.5rem;
+  text-align: center;
+  color: white;
+  margin-bottom: 3rem;
+  max-width: 80%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.rs-panel {
+  background-color: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.rs-flex-box-grid-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}

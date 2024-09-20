@@ -1,0 +1,39 @@
+:root {
+    /* Primary colors */
+    --primary-dark: #121212;
+    --primary-light: #1e1e1e;
+    --accent: #ff6b00;
+    
+    /* Text colors */
+    --text-primary: #ffffff;
+    --text-secondary: #e0e0e0;
+    --text-tertiary: #a0a0a0;
+    
+    /* Login colors */
+    --login-background: linear-gradient(135deg, #1a1a1a, #2c2c2c, #0f0f0f, #000000);
+
+    /* UI colors */
+    --ui-background: #000000;
+    --ui-card: #1a1a1a;
+    --ui-border: #2a2a2a;
+  
+    /* RSuite color overrides */
+    --rs-primary-50: #1e1e1e;
+    --rs-primary-100: #2a2a2a;
+    --rs-primary-200: #3a3a3a;
+    --rs-primary-300: #4a4a4a;
+    --rs-primary-400: #5a5a5a;
+    --rs-primary-500: #ff6b00;
+    --rs-primary-600: #ff7b1a;
+    --rs-primary-700: #ff8c33;
+    --rs-primary-800: #ff9c4d;
+    --rs-primary-900: #ffad66;
+
+    --rs-color-red: #f44336;
+    --rs-color-orange: #fa8900;
+    --rs-color-yellow: #ffb300;
+    --rs-color-green: #4caf50;
+    --rs-color-cyan: #00bcd4;
+    --rs-color-blue: #2196f3;
+    --rs-color-violet: #673ab7;
+  }
