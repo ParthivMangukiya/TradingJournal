@@ -3,6 +3,7 @@ import { Tabs, Panel } from 'rsuite';
 import SetupManager from '../components/EntityManagers/SetupManager';
 import MarketManager from '../components/EntityManagers/MarketManager';
 import TypeManager from '../components/EntityManagers/TypeManager';
+import AccountManager from '../components/EntityManagers/AccountManager';
 
 const ManageEntitiesPage = () => {
   const [activeKey, setActiveKey] = useState('setup');
@@ -22,6 +23,9 @@ const ManageEntitiesPage = () => {
         </Tabs.Tab>
         <Tabs.Tab eventKey="type" title="Type">
           <TypeManager />
+        </Tabs.Tab>
+        <Tabs.Tab eventKey="account" title="Account">
+          <AccountManager />
         </Tabs.Tab>
       </Tabs>
     </Panel>

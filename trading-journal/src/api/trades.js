@@ -471,3 +471,23 @@ export const getYearlyClosedTradesReport = async (userId, startDate = null, endD
 
   return data;
 };
+
+// Accounts
+export const updateAccount = async (id, account_name) => {
+  const { data, error } = await supabase
+    .from('accounts')
+    .update({ account_name })
+    .eq('id', id)
+    .select();
+  if (error) throw error;
+  return data[0];
+};
+
+export const deleteAccount = async (id) => {
+  const { data, error } = await supabase
+    .from('accounts')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
+  return data;
+};
