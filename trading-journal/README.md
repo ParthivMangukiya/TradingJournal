@@ -1,14 +1,8 @@
-# Trading Journal
+# React + Vite
 
-## Description
-This is a simple trading journal app built with React and Supabase. It allows users to track their trades, analyze their performance, and improve their strategies.
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-## Features
-- User authentication
-- Trade tracking
-- Performance analysis
-- Strategy improvement
+Currently, two official plugins are available:
 
-
-# Attribution
-- https://github.com/daniellaera/react-supabase-auth-provider/tree/main
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
