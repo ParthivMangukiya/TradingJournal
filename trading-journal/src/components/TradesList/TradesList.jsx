@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Table, InputGroup, Input, Panel, TagPicker, Tag, IconButton, toaster, Message, Pagination } from 'rsuite';
-import { getTrades, getBuyTransactions, getSellTransactions, getSetups, getTypes, getMarkets, getAccounts, deleteTrade } from '../../api/trades';
+import { getTradesWithTransactions, getSetups, getTypes, getMarkets, getAccounts, deleteTrade } from '../../api/trades';
 import { useAuth } from '../../contexts/AuthContext';
 import TrashIcon from '@rsuite/icons/Trash';
 import DateRangePicker from '../UIHelpers/DateRangePicker';
@@ -57,26 +57,15 @@ const TradesList = () => {
 
   const fetchTrades = useCallback(async () => {
     try {
-      const tradesData = await getTrades(user.id);
-      const tradesWithTransactions = await Promise.all(
-        tradesData.map(async (trade) => {
-          const buyTransactions = await getBuyTransactions(trade.id) || [];
-          const sellTransactions = await getSellTransactions(trade.id) || [];
-          return {
-            ...trade,
-            buyTransactions,
-            sellTransactions,
-          };
-        })
-      );
-      setTrades(tradesWithTransactions);
-      setFilteredTrades(tradesWithTransactions);
+      const tradesData = await getTradesWithTransactions(user.id);
+      setTrades(tradesData);
+      setFilteredTrades(tradesData);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching trades:', error);
       setLoading(false);
     }
-  }, [user.id, getBuyTransactions, getSellTransactions, setTrades, setFilteredTrades, setLoading]);
+  }, [user.id]);
 
   const fetchFilterOptions = async () => {
     try {
@@ -120,7 +109,7 @@ const TradesList = () => {
 
     // Apply date filter and flatten the trade data
     filtered = filtered.flatMap(trade => {
-      const buyRows = (trade.buyTransactions || []).map(transaction => ({
+      const buyRows = (trade.buy_transactions || []).map(transaction => ({
         ...trade,
         ...transaction,
         type: 'Buy',
@@ -131,7 +120,7 @@ const TradesList = () => {
         market: markets.find(m => m.value === trade.market_id)?.label || '',
         account_name: accounts.find(a => a.value === trade.account_id)?.label || ''
       }));
-      const sellRows = (trade.sellTransactions || []).map(transaction => ({
+      const sellRows = (trade.sell_transactions || []).map(transaction => ({
         ...trade,
         ...transaction,
         type: 'Sell',

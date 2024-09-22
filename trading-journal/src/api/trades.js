@@ -491,3 +491,10 @@ export const deleteAccount = async (id) => {
   if (error) throw error;
   return data;
 };
+
+export const getTradesWithTransactions = async (userId) => {
+  const { data, error } = await supabase
+    .rpc('get_trades_with_transactions', { p_user_id: userId });
+  if (error) throw error;
+  return data;
+};
