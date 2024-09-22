@@ -91,6 +91,7 @@ alter table "public"."setup" enable row level security;
 create table "public"."type" (
     "id" integer not null default nextval('type_id_seq'::regclass),
     "type_name" text not null,
+    "setup_id" integer not null,
     "user_id" uuid not null
 );
 
@@ -178,6 +179,9 @@ alter table "public"."trades" validate constraint "trades_user_id_fkey";
 alter table "public"."type" add constraint "type_user_id_fkey" FOREIGN KEY (user_id) REFERENCES auth.users(id) not valid;
 
 alter table "public"."type" validate constraint "type_user_id_fkey";
+
+alter table "public"."type" add constraint "type_setup_id_fkey" 
+    FOREIGN KEY (setup_id) REFERENCES setup(id) ON DELETE CASCADE;
 
 alter table "public"."buy_transactions" add constraint "buy_transactions_user_id_fkey" FOREIGN KEY (user_id) REFERENCES auth.users(id) not valid;
 
@@ -772,3 +776,272 @@ CREATE TRIGGER check_sell_quantity
 BEFORE INSERT OR UPDATE ON sell_transactions
 FOR EACH ROW
 EXECUTE FUNCTION check_remaining_quantity();
+
+
+-- Modify the get_closed_trades_report function
+CREATE OR REPLACE FUNCTION get_closed_trades_report(p_user_id UUID, p_start_date DATE DEFAULT NULL, p_end_date DATE DEFAULT NULL)
+RETURNS TABLE (
+    id INT,
+    name TEXT,
+    setup_name TEXT,
+    type_name TEXT,
+    account_id INT,
+    account_name TEXT,
+    risk_percent NUMERIC,
+    brokerage NUMERIC,
+    net_buy NUMERIC,
+    net_sell NUMERIC,
+    gross_pl NUMERIC,
+    net_pl NUMERIC,
+    net_pl_percent NUMERIC,
+    stop_loss_percent NUMERIC,
+    days INT,
+    gross_r NUMERIC,
+    net_r NUMERIC,
+    last_sell_date DATE
+) AS $$
+BEGIN
+    RETURN QUERY
+    WITH closed_trades AS (
+        SELECT t.id, t.name, t.setup_id, t.type_id, t.account_id, t.risk_percent,
+               MIN(b.buy_date) AS first_buy_date,
+               MAX(s.sell_date) AS last_sell_date,
+               SUM(b.quantity) AS total_bought,
+               SUM(s.quantity) AS total_sold
+        FROM trades t
+        JOIN buy_transactions b ON t.id = b.trade_id
+        JOIN sell_transactions s ON t.id = s.trade_id
+        WHERE t.user_id = p_user_id
+          AND (p_start_date IS NULL OR b.buy_date >= p_start_date)
+          AND (p_end_date IS NULL OR s.sell_date <= p_end_date)
+        GROUP BY t.id, t.name, t.setup_id, t.type_id, t.account_id, t.risk_percent
+        HAVING SUM(b.quantity) = SUM(s.quantity)
+    )
+    SELECT 
+        ct.id,
+        ct.name,
+        setup.setup_name,
+        ty.type_name,
+        ct.account_id,
+        a.account_name,
+        ct.risk_percent,
+        SUM(b.buy_brokerage) + SUM(s.sell_brokerage) AS brokerage,
+        SUM(b.quantity * b.buy_price) AS net_buy,
+        SUM(s.quantity * s.sell_price) AS net_sell,
+        SUM(s.quantity * s.sell_price) - SUM(b.quantity * b.buy_price) AS gross_pl,
+        (SUM(s.quantity * s.sell_price) - SUM(b.quantity * b.buy_price)) - (SUM(b.buy_brokerage) + SUM(s.sell_brokerage)) AS net_pl,
+        ((SUM(s.quantity * s.sell_price) - SUM(b.quantity * b.buy_price)) - (SUM(b.buy_brokerage) + SUM(s.sell_brokerage))) / SUM(b.quantity * b.buy_price) * 100 AS net_pl_percent,
+        MAX(b.stop_loss_percent) AS stop_loss_percent,
+        ct.last_sell_date - ct.first_buy_date AS days,
+        ((SUM(s.quantity * s.sell_price) - SUM(b.quantity * b.buy_price)) / SUM(b.quantity * b.buy_price)) / NULLIF(MAX(b.stop_loss_percent), 0) AS gross_r,
+        (((SUM(s.quantity * s.sell_price) - SUM(b.quantity * b.buy_price)) / SUM(b.quantity * b.buy_price)) / NULLIF(MAX(b.stop_loss_percent), 0)) * ct.risk_percent * 100 AS net_r,
+        ct.last_sell_date
+    FROM closed_trades ct
+    JOIN buy_transactions b ON ct.id = b.trade_id
+    JOIN sell_transactions s ON ct.id = s.trade_id
+    JOIN setup ON ct.setup_id = setup.id
+    JOIN type ty ON ct.type_id = ty.id
+    JOIN accounts a ON ct.account_id = a.id
+    GROUP BY ct.id, ct.name, setup.setup_name, ty.type_name, ct.account_id, a.account_name, ct.risk_percent, ct.last_sell_date, ct.first_buy_date;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Modify the get_monthly_closed_trades_report function
+CREATE OR REPLACE FUNCTION get_monthly_closed_trades_report(p_user_id UUID, p_start_date DATE DEFAULT NULL, p_end_date DATE DEFAULT NULL)
+RETURNS TABLE (
+    month DATE,
+    account_id INT,
+    account_name TEXT,
+    gross_r NUMERIC,
+    net_r NUMERIC,
+    total_trades INTEGER,
+    wins INTEGER,
+    losses INTEGER,
+    win_average NUMERIC,
+    loss_average NUMERIC,
+    max_win NUMERIC,
+    max_loss NUMERIC,
+    max_r NUMERIC,
+    min_r NUMERIC,
+    avg_win_days NUMERIC,
+    avg_loss_days NUMERIC
+) AS $$
+BEGIN
+    RETURN QUERY
+    WITH monthly_trades AS (
+        SELECT
+            DATE_TRUNC('month', s.sell_date)::DATE AS month,
+            ct.account_id,
+            ct.account_name,
+            ct.gross_r,
+            ct.net_r,
+            CASE WHEN ct.net_pl > 0 THEN 1 ELSE 0 END AS is_win,
+            ct.net_pl,
+            ct.days
+        FROM get_closed_trades_report(p_user_id, p_start_date, p_end_date) ct
+        JOIN sell_transactions s ON ct.id = s.trade_id
+        WHERE (p_start_date IS NULL OR s.sell_date >= p_start_date)
+          AND (p_end_date IS NULL OR s.sell_date <= p_end_date)
+    )
+    SELECT
+        mt.month,
+        mt.account_id,
+        mt.account_name,
+        SUM(mt.gross_r)::NUMERIC AS gross_r,
+        SUM(mt.net_r)::NUMERIC AS net_r,
+        COUNT(*)::INTEGER AS total_trades,
+        SUM(mt.is_win)::INTEGER AS wins,
+        (COUNT(*) - SUM(mt.is_win))::INTEGER AS losses,
+        COALESCE(AVG(CASE WHEN mt.is_win = 1 THEN mt.net_pl END), 0)::NUMERIC AS win_average,
+        COALESCE(AVG(CASE WHEN mt.is_win = 0 THEN mt.net_pl END), 0)::NUMERIC AS loss_average,
+        MAX(CASE WHEN mt.is_win = 1 THEN mt.net_pl END)::NUMERIC AS max_win,
+        MIN(CASE WHEN mt.is_win = 0 THEN mt.net_pl END)::NUMERIC AS max_loss,
+        MAX(mt.net_r)::NUMERIC AS max_r,
+        MIN(mt.net_r)::NUMERIC AS min_r,
+        COALESCE(AVG(CASE WHEN mt.is_win = 1 THEN mt.days END), 0)::NUMERIC AS avg_win_days,
+        COALESCE(AVG(CASE WHEN mt.is_win = 0 THEN mt.days END), 0)::NUMERIC AS avg_loss_days
+    FROM monthly_trades mt
+    GROUP BY mt.month, mt.account_id, mt.account_name
+    ORDER BY mt.month, mt.account_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Modify the get_quarterly_closed_trades_report function
+CREATE OR REPLACE FUNCTION get_quarterly_closed_trades_report(p_user_id UUID, p_start_date DATE DEFAULT NULL, p_end_date DATE DEFAULT NULL)
+RETURNS TABLE (
+    quarter DATE,
+    account_id INT,
+    account_name TEXT,
+    win_average NUMERIC,
+    loss_average NUMERIC,
+    rr NUMERIC,
+    awlr NUMERIC,
+    win_percentage NUMERIC,
+    total_trades INTEGER,
+    avg_win_days NUMERIC,
+    avg_loss_days NUMERIC,
+    gross_r NUMERIC,
+    net_r NUMERIC
+) AS $$
+BEGIN
+    RETURN QUERY
+    WITH quarterly_trades AS (
+        SELECT
+            DATE_TRUNC('quarter', s.sell_date)::DATE AS quarter,
+            ct.account_id,
+            ct.account_name,
+            ct.gross_r,
+            ct.net_r,
+            CASE WHEN ct.net_pl > 0 THEN 1 ELSE 0 END AS is_win,
+            ct.net_pl,
+            ct.days
+        FROM get_closed_trades_report(p_user_id, p_start_date, p_end_date) ct
+        JOIN sell_transactions s ON ct.id = s.trade_id
+        WHERE (p_start_date IS NULL OR s.sell_date >= p_start_date)
+          AND (p_end_date IS NULL OR s.sell_date <= p_end_date)
+    )
+    SELECT
+        qt.quarter,
+        qt.account_id,
+        qt.account_name,
+        COALESCE(AVG(CASE WHEN qt.is_win = 1 THEN qt.net_pl END), 0)::NUMERIC AS win_average,
+        ABS(COALESCE(AVG(CASE WHEN qt.is_win = 0 THEN qt.net_pl END), 0))::NUMERIC AS loss_average,
+        CASE 
+            WHEN ABS(COALESCE(AVG(CASE WHEN qt.is_win = 0 THEN qt.net_pl END), 0)) = 0 THEN 0
+            ELSE (COALESCE(AVG(CASE WHEN qt.is_win = 1 THEN qt.net_pl END), 0) / 
+                  ABS(COALESCE(AVG(CASE WHEN qt.is_win = 0 THEN qt.net_pl END), 0)))::NUMERIC 
+        END AS rr,
+        CASE 
+            WHEN (COUNT(*) - SUM(qt.is_win)) = 0 OR ABS(COALESCE(AVG(CASE WHEN qt.is_win = 0 THEN qt.net_pl END), 0)) = 0 THEN 0
+            ELSE ((SUM(qt.is_win)::NUMERIC / COUNT(*)::NUMERIC) * 
+                  COALESCE(AVG(CASE WHEN qt.is_win = 1 THEN qt.net_pl END), 0)) / 
+                 (((COUNT(*) - SUM(qt.is_win))::NUMERIC / COUNT(*)::NUMERIC) * 
+                  ABS(COALESCE(AVG(CASE WHEN qt.is_win = 0 THEN qt.net_pl END), 0)))
+        END AS awlr,
+        (SUM(qt.is_win)::NUMERIC / COUNT(*)::NUMERIC * 100)::NUMERIC AS win_percentage,
+        COUNT(*)::INTEGER AS total_trades,
+        COALESCE(AVG(CASE WHEN qt.is_win = 1 THEN qt.days END), 0)::NUMERIC AS avg_win_days,
+        COALESCE(AVG(CASE WHEN qt.is_win = 0 THEN qt.days END), 0)::NUMERIC AS avg_loss_days,
+        SUM(qt.gross_r)::NUMERIC AS gross_r,
+        SUM(qt.net_r)::NUMERIC AS net_r
+    FROM quarterly_trades qt
+    GROUP BY qt.quarter, qt.account_id, qt.account_name
+    ORDER BY qt.quarter, qt.account_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Modify the get_yearly_closed_trades_report function
+CREATE OR REPLACE FUNCTION get_yearly_closed_trades_report(p_user_id UUID, p_start_date DATE DEFAULT NULL, p_end_date DATE DEFAULT NULL)
+RETURNS TABLE (
+    year DATE,
+    account_id INT,
+    account_name TEXT,
+    win_average NUMERIC,
+    loss_average NUMERIC,
+    win_percentage NUMERIC,
+    rr NUMERIC,
+    awlr NUMERIC,
+    max_win NUMERIC,
+    max_loss NUMERIC,
+    max_r NUMERIC,
+    min_r NUMERIC,
+    avg_win_days NUMERIC,
+    avg_loss_days NUMERIC,
+    average_profit_amt NUMERIC,
+    average_loss_amt NUMERIC,
+    gross_r NUMERIC,
+    net_r NUMERIC,
+    total_trades INTEGER
+) AS $$
+BEGIN
+    RETURN QUERY
+    WITH yearly_trades AS (
+        SELECT
+            DATE_TRUNC('year', s.sell_date)::DATE AS year,
+            ct.account_id,
+            ct.account_name,
+            ct.gross_r,
+            ct.net_r,
+            CASE WHEN ct.net_pl > 0 THEN 1 ELSE 0 END AS is_win,
+            ct.net_pl,
+            ct.days
+        FROM get_closed_trades_report(p_user_id, p_start_date, p_end_date) ct
+        JOIN sell_transactions s ON ct.id = s.trade_id
+        WHERE (p_start_date IS NULL OR s.sell_date >= p_start_date)
+          AND (p_end_date IS NULL OR s.sell_date <= p_end_date)
+    )
+    SELECT
+        yt.year,
+        yt.account_id,
+        yt.account_name,
+        COALESCE(AVG(CASE WHEN yt.is_win = 1 THEN yt.net_pl END), 0)::NUMERIC AS win_average,
+        ABS(COALESCE(AVG(CASE WHEN yt.is_win = 0 THEN yt.net_pl END), 0))::NUMERIC AS loss_average,
+        (SUM(yt.is_win)::NUMERIC / COUNT(*)::NUMERIC * 100)::NUMERIC AS win_percentage,
+        CASE 
+            WHEN ABS(COALESCE(AVG(CASE WHEN yt.is_win = 0 THEN yt.net_pl END), 0)) = 0 THEN 0
+            ELSE (COALESCE(AVG(CASE WHEN yt.is_win = 1 THEN yt.net_pl END), 0) / 
+                  ABS(COALESCE(AVG(CASE WHEN yt.is_win = 0 THEN yt.net_pl END), 0)))::NUMERIC 
+        END AS rr,
+        CASE 
+            WHEN (COUNT(*) - SUM(yt.is_win)) = 0 OR ABS(COALESCE(AVG(CASE WHEN yt.is_win = 0 THEN yt.net_pl END), 0)) = 0 THEN 0
+            ELSE ((SUM(yt.is_win)::NUMERIC / COUNT(*)::NUMERIC) * 
+                  COALESCE(AVG(CASE WHEN yt.is_win = 1 THEN yt.net_pl END), 0)) / 
+                 (((COUNT(*) - SUM(yt.is_win))::NUMERIC / COUNT(*)::NUMERIC) * 
+                  ABS(COALESCE(AVG(CASE WHEN yt.is_win = 0 THEN yt.net_pl END), 0)))
+        END AS awlr,
+        MAX(CASE WHEN yt.is_win = 1 THEN yt.net_pl END)::NUMERIC AS max_win,
+        MIN(CASE WHEN yt.is_win = 0 THEN yt.net_pl END)::NUMERIC AS max_loss,
+        MAX(yt.net_r)::NUMERIC AS max_r,
+        MIN(yt.net_r)::NUMERIC AS min_r,
+        COALESCE(AVG(CASE WHEN yt.is_win = 1 THEN yt.days END), 0)::NUMERIC AS avg_win_days,
+        COALESCE(AVG(CASE WHEN yt.is_win = 0 THEN yt.days END), 0)::NUMERIC AS avg_loss_days,
+        COALESCE(AVG(CASE WHEN yt.is_win = 1 THEN yt.net_pl END), 0)::NUMERIC AS average_profit_amt,
+        ABS(COALESCE(AVG(CASE WHEN yt.is_win = 0 THEN yt.net_pl END), 0))::NUMERIC AS average_loss_amt,
+        SUM(yt.gross_r)::NUMERIC AS gross_r,
+        SUM(yt.net_r)::NUMERIC AS net_r,
+        COUNT(*)::INTEGER AS total_trades
+    FROM yearly_trades yt
+    GROUP BY yt.year, yt.account_id, yt.account_name
+    ORDER BY yt.year, yt.account_id;
+END;
+$$ LANGUAGE plpgsql;

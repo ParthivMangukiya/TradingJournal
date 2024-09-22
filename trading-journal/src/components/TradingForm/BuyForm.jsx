@@ -48,12 +48,13 @@ const BuyForm = () => {
   const [markets, setMarkets] = useState([]);
   const [setups, setSetups] = useState([]);
   const [types, setTypes] = useState([]);
+  const [setupTypes, setSetupTypes] = useState({});
+  const [availableTypes, setAvailableTypes] = useState([]);
 
   useEffect(() => {
     fetchDropdownData();
   }, []);
 
-  // Move these functions above the useEffect
   const updateBrokerageValues = useCallback(() => {
     const totalValue = formValue.buy_price * formValue.quantity;
     if (formValue.buy_brokerage_percent !== '') {
@@ -86,23 +87,61 @@ const BuyForm = () => {
       const setupsData = await getSetups();
       const typesData = await getTypes();
 
-      setAccounts(accountsData.map(a => ({ label: a.account_name, value: a.id })));
-      setMarkets(marketsData.map(m => ({ label: m.market_name, value: m.id })));
-      setSetups(setupsData.map(s => ({ label: s.setup_name, value: s.id })));
-      setTypes(typesData.map(t => ({ label: t.type_name, value: t.id })));
+      setAccounts(accountsData.map(a => ({ label: a.account_name, value: a.id.toString() })));
+      setMarkets(marketsData.map(m => ({ label: m.market_name, value: m.id.toString() })));
+      
+      const setupsFormatted = setupsData.map(s => ({ label: s.setup_name, value: s.id.toString() }));
+      setSetups(setupsFormatted);
 
-      // Set default values
-      setFormValue(prev => ({
-        ...prev,
-        account_id: accountsData[0]?.id || null,
-        market_id: marketsData[0]?.id || null,
-        setup_id: setupsData[0]?.id || null,
-        type_id: typesData[0]?.id || null,
-      }));
+      const allTypes = typesData.map(t => ({ label: t.type_name, value: t.id.toString() }));
+      setTypes(allTypes);
+
+      // Create setup to types mapping
+      const setupTypesMap = {};
+      typesData.forEach(type => {
+        const setupId = type.setup_id.toString();
+        if (!setupTypesMap[setupId]) {
+          setupTypesMap[setupId] = [];
+        }
+        setupTypesMap[setupId].push({ label: type.type_name, value: type.id.toString() });
+      });
+      setSetupTypes(setupTypesMap);
+
+      // Set default setup and type
+      if (setupsFormatted.length > 0) {
+        const defaultSetup = setupsFormatted[0].value;
+        const defaultTypes = setupTypesMap[defaultSetup] || [];
+        setFormValue(prev => ({
+          ...prev,
+          setup_id: defaultSetup,
+          type_id: defaultTypes.length > 0 ? defaultTypes[0].value : null
+        }));
+        setAvailableTypes(defaultTypes);
+      }
+
     } catch (error) {
       console.error('Error fetching dropdown data:', error);
       toaster.push(<Message type="error">Error loading form data</Message>);
     }
+  };
+
+  const handleSetupChange = (value) => {
+    setFormValue(prev => {
+      const newState = { ...prev, setup_id: value };
+      if (value) {
+        const typesForSetup = setupTypes[value] || [];
+        setAvailableTypes(typesForSetup);
+        newState.type_id = typesForSetup.length > 0 ? typesForSetup[0].value : null;
+      } else {
+        setAvailableTypes([]);
+        newState.type_id = null;
+      }
+      return newState;
+    });
+  };
+
+  const handleTypeChange = (value) => {
+    setFormValue(prev => ({ ...prev, type_id: value }));
   };
 
   const handleBrokerageChange = (field, value) => {
@@ -231,6 +270,7 @@ const BuyForm = () => {
               value={formValue.account_id}
               onChange={(value) => setFormValue({...formValue, account_id: value})}
               block
+              cleanable
             />
           </Col>
         </Row>
@@ -251,17 +291,20 @@ const BuyForm = () => {
             <SelectPicker 
               data={setups} 
               value={formValue.setup_id}
-              onChange={(value) => setFormValue({...formValue, setup_id: value})}
+              onChange={handleSetupChange}
               block
+              cleanable={false}
             />
           </Col>
           <Col xs={24} sm={8}>
             <label>Type</label>
             <SelectPicker 
-              data={types} 
+              data={availableTypes} 
               value={formValue.type_id}
-              onChange={(value) => setFormValue({...formValue, type_id: value})}
+              onChange={handleTypeChange}
               block
+              cleanable={false}
+              disabled={!formValue.setup_id}
             />
           </Col>
           <Col xs={24} sm={8}>
@@ -271,6 +314,7 @@ const BuyForm = () => {
               value={formValue.market_id}
               onChange={(value) => setFormValue({...formValue, market_id: value})}
               block
+              cleanable
             />
           </Col>
         </Row>
@@ -418,7 +462,6 @@ const BuyForm = () => {
           </Col>
         </Row>
 
-        {/* Add a new Row with margin-top for the Submit button */}
         <Row style={{ marginTop: '20px' }}>
           <Col xs={24}>
             <Button appearance="primary" type="submit">

@@ -1,6 +1,6 @@
 import React from 'react';
 import EntityManager from './EntityManager';
-import { getTypes, createType, updateType, deleteType } from '../../api/trades';
+import { getTypes, createType, updateType, deleteType, getSetups } from '../../api/trades';
 import { supabase } from '../../config/supabase-client';
 
 const checkCanDeleteType = async (typeId) => {
@@ -17,10 +17,12 @@ const TypeManager = () => (
   <EntityManager
     entityNameProp="type"
     getEntities={getTypes}
-    createEntity={createType}
-    updateEntity={updateType}
+    createEntity={(name, userId, setupId) => createType(name, userId, setupId)}
+    updateEntity={(id, name, setupId) => updateType(id, name, setupId)}
     deleteEntity={deleteType}
     checkCanDelete={checkCanDeleteType}
+    relatedEntity="setup"
+    getRelatedEntities={getSetups}
   />
 );
 

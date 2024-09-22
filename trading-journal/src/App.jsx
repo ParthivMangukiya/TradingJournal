@@ -1,4 +1,4 @@
-import React from 'react';
+import { React } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { CustomProvider } from 'rsuite';
 import { AuthProvider } from './contexts/AuthContext';
@@ -6,7 +6,9 @@ import RootLayout from './layouts/RootLayout';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage/LoginPage';
 import ManageEntitiesPage from './pages/ManageEntitiesPage';
-import TradeReport from './components/TradeReport/TradeReport';
+import TradeReportPage from './pages/TradeReportPage';
+import ClosedTradesPage from './pages/ClosedTradesPage';
+import UploadDataPage from './pages/UploadDataPage'; // Import the new UploadData page
 import ProtectedRoute from './components/ProtectedRoute';
 import './color.css';
 import 'rsuite/dist/rsuite.min.css';
@@ -16,7 +18,7 @@ const App = () => {
     <CustomProvider>
       <BrowserRouter>
         <AuthProvider>
-        <Routes>
+          <Routes>
             <Route
               path="/"
               element={
@@ -42,7 +44,27 @@ const App = () => {
               element={
                 <ProtectedRoute>
                   <RootLayout>
-                    <TradeReport />
+                    <TradeReportPage />
+                  </RootLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/closed-trades"
+              element={
+                <ProtectedRoute>
+                  <RootLayout>
+                    <ClosedTradesPage />
+                  </RootLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/upload-data"
+              element={
+                <ProtectedRoute>
+                  <RootLayout>
+                    <UploadDataPage />
                   </RootLayout>
                 </ProtectedRoute>
               }

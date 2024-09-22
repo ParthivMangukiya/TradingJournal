@@ -1,0 +1,92 @@
+.upload-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem;
+  gap: 2rem;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.upload-section {
+  width: 100%;
+}
+
+.upload-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.upload-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  border: 2px dashed #ccc;
+  border-radius: 8px;
+  background-color: #fff;
+  transition: all 0.3s ease;
+  width: 100%;
+}
+
+.upload-area:hover {
+  border-color: #3498ff;
+}
+
+.upload-button {
+  margin-top: 1rem;
+}
+
+.upload-message {
+  margin-top: 1rem;
+  width: 100%;
+  text-align: center;
+}
+
+.log-section {
+  width: 100%;
+}
+
+.log-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background-color: #f8f9fa;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.log-container h3 {
+  padding: 1rem;
+  margin: 0;
+  background-color: #e9ecef;
+  border-bottom: 1px solid #ccc;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+}
+
+.log-content {
+  max-height: 400px;
+  overflow: auto;
+  padding: 1rem;
+  font-family: monospace;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.log-content p {
+  margin: 0;
+  padding: 2px 0;
+}

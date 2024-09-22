@@ -1,17 +1,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Table } from 'rsuite';
-import { getMonthlyClosedTradesReport } from '../../api/trades';
-import { useAuth } from '../../contexts/AuthContext';
-import DateRangePicker from '../UIHelpers/DateRangePicker';
+import { getMonthlyClosedTradesReport } from '../../../api/trades.js';
+import { useAuth } from '../../../contexts/AuthContext.jsx';
+import MonthRangePicker from '../UIHelpers/MonthRangePicker.jsx';
 
 const { Column, HeaderCell, Cell } = Table;
 
 // Helper function to safely format numbers
 const safeNumber = (value, decimals = 2) => {
-  return typeof value === 'number' ? value.toFixed(decimals) : 'N/A';
+  return typeof value === 'number' ? value.toFixed(decimals) : '-';
 };
 
-const TradeReport = () => {
+// Helper function to format date as "Month Year"
+const formatMonth = (dateString) => {
+  if (!dateString) return 'N/A';
+  const date = new Date(dateString);
+  return date.toLocaleString('default', { month: 'long', year: 'numeric' });
+};
+
+const MonthlyTradeReport = () => {
   const { user } = useAuth();
   const [reportData, setReportData] = useState([]);
   const [dateRange, setDateRange] = useState([null, null]);
@@ -30,19 +37,20 @@ const TradeReport = () => {
   useEffect(() => {
     fetchClosedTradesReport(user, dateRange);
   }, [fetchClosedTradesReport, user, dateRange]);
-  
 
-  const handleDateRangeChange = (start, end) => {
-    console.log('start', start);
-    console.log('end', end);
-    setDateRange([start, end]);
+  const handleMonthRangeChange = (start, end) => {
+    if (start && end) {
+      const startDate = new Date(start.getFullYear(), start.getMonth(), 1);
+      const endDate = new Date(end.getFullYear(), end.getMonth(), 31);
+      setDateRange([startDate, endDate]);
+    } else {
+      setDateRange([null, null]);
+    }
   };
-
- 
 
   return (
     <div>
-      <DateRangePicker onChange={handleDateRangeChange} />
+      <MonthRangePicker onChange={handleMonthRangeChange} />
       <Table
         height={400}
         data={reportData}
@@ -52,7 +60,7 @@ const TradeReport = () => {
       >
         <Column width={120} align="center" fixed>
           <HeaderCell>Month</HeaderCell>
-          <Cell dataKey="month" />
+          <Cell>{rowData => formatMonth(rowData.month)}</Cell>
         </Column>
 
         <Column width={100}>
@@ -152,4 +160,4 @@ const TradeReport = () => {
   );
 };
 
-export default TradeReport;
+export default MonthlyTradeReport;

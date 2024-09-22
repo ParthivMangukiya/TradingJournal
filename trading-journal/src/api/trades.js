@@ -157,24 +157,30 @@ export const deleteSetup = async (id) => {
 export const getTypes = async () => {
   const { data, error } = await supabase
     .from('type')
-    .select('*');
+    .select(`
+      *,
+      setup:setup_id (
+        id,
+        setup_name
+      )
+    `);
   if (error) throw error;
   return data;
 };
 
-export const createType = async (type_name, user_id) => {
+export const createType = async (typeName, userId, setupId) => {
   const { data, error } = await supabase
     .from('type')
-    .insert([{ type_name, user_id }])
+    .insert({ type_name: typeName, user_id: userId, setup_id: setupId })
     .select();
   if (error) throw error;
   return data[0];
 };
 
-export const updateType = async (id, type_name) => {
+export const updateType = async (id, typeName, setupId) => {
   const { data, error } = await supabase
     .from('type')
-    .update({ type_name })
+    .update({ type_name: typeName, setup_id: setupId })
     .eq('id', id)
     .select();
   if (error) throw error;
@@ -319,6 +325,16 @@ export const getAccounts = async () => {
   return data;
 };
 
+// Add this function to create a new account
+export const createAccount = async (account_name, user_id) => {
+  const { data, error } = await supabase
+    .from('accounts')
+    .insert([{ account_name, user_id }])
+    .select();
+  if (error) throw error;
+  return data[0];
+};
+
 // Add this function to the trades.js file
 export const getRemainingQuantity = async (tradeId) => {
   const { data: buyTransactions, error: buyError } = await supabase
@@ -375,4 +391,83 @@ export const deleteTrade = async (tradeId) => {
     .eq('id', tradeId);
 
   if (error) throw error;
+};
+
+export const getClosedTradesReport = async (userId, startDate = null, endDate = null) => {
+  // Convert dates to ISO string format (YYYY-MM-DD)
+  const formattedStartDate = startDate ? new Date(startDate).toISOString().split('T')[0] : null;
+  const formattedEndDate = endDate ? new Date(endDate).toISOString().split('T')[0] : null;
+  const { data, error } = await supabase
+    .rpc('get_closed_trades_report', { 
+      p_user_id: userId,
+      p_start_date: formattedStartDate,
+      p_end_date: formattedEndDate
+    });
+
+  if (error) {
+    console.error('Error fetching closed trades report:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+export const getMonthlyClosedTradesReport = async (userId, startDate = null, endDate = null) => {
+  // Convert dates to ISO string format (YYYY-MM-DD)
+  const formattedStartDate = startDate ? new Date(startDate).toISOString().split('T')[0] : null;
+  const formattedEndDate = endDate ? new Date(endDate).toISOString().split('T')[0] : null;
+
+  const { data, error } = await supabase
+    .rpc('get_monthly_closed_trades_report', { 
+      p_user_id: userId,
+      p_start_date: formattedStartDate,
+      p_end_date: formattedEndDate
+    });
+
+  if (error) {
+    console.error('Error fetching monthly closed trades report:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+export const getQuarterlyClosedTradesReport = async (userId, startDate = null, endDate = null) => {
+  // Convert dates to ISO string format (YYYY-MM-DD)
+  const formattedStartDate = startDate ? new Date(startDate).toISOString().split('T')[0] : null;
+  const formattedEndDate = endDate ? new Date(endDate).toISOString().split('T')[0] : null;
+
+  const { data, error } = await supabase
+    .rpc('get_quarterly_closed_trades_report', { 
+      p_user_id: userId,
+      p_start_date: formattedStartDate,
+      p_end_date: formattedEndDate
+    });
+
+  if (error) {
+    console.error('Error fetching quarterly closed trades report:', error);
+    throw error;
+  }
+
+  return data;
+};
+
+export const getYearlyClosedTradesReport = async (userId, startDate = null, endDate = null) => {
+  // Convert dates to ISO string format (YYYY-MM-DD)
+  const formattedStartDate = startDate ? new Date(startDate).toISOString().split('T')[0] : null;
+  const formattedEndDate = endDate ? new Date(endDate).toISOString().split('T')[0] : null;
+
+  const { data, error } = await supabase
+    .rpc('get_yearly_closed_trades_report', { 
+      p_user_id: userId,
+      p_start_date: formattedStartDate,
+      p_end_date: formattedEndDate
+    });
+
+  if (error) {
+    console.error('Error fetching yearly closed trades report:', error);
+    throw error;
+  }
+
+  return data;
 };
